@@ -21,9 +21,8 @@
 #include <plat/board.h>
 #include <plat/vram.h>
 #include <plat/dsp.h>
-
 #include <plat/omap-secure.h>
-
+#include <plat/remoteproc.h>
 
 #define NO_LENGTH_CHECK 0xffffffff
 
@@ -76,4 +75,5 @@ void __init omap_init_consistent_dma_size(void)
 #ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
 	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
 #endif
+	omap_rproc_reserve_cma();
 }

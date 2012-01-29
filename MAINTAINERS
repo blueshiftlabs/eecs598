@@ -1234,6 +1234,13 @@ L:	lm-sensors@lm-sensors.org
 S:	Maintained
 F:	drivers/hwmon/asb100.c
 
+ASYNCHRONOUS MULTIPROCESSING (AMP) FRAMEWORK
+M:	Ohad Ben-Cohen <ohad@wizery.com>
+S:	Maintained
+F:	drivers/amp/
+F:	Documentation/amp/
+F:	include/linux/amp/
+
 ASYNCHRONOUS TRANSFERS/TRANSFORMS (IOAT) API
 M:	Dan Williams <dan.j.williams@intel.com>
 W:	http://sourceforge.net/projects/xscaleiop
@@ -4687,6 +4694,12 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
 S:	Maintained
 F:	arch/arm/*omap*/
+
+OMAP ASYNCHRONOUS MULTIPROCESSING (AMP) SUPPORT
+M:	Ohad Ben-Cohen <ohad@wizery.com>
+L:	linux-omap@vger.kernel.org
+S:	Maintained
+F:	arch/arm/*omap*/*remoteproc*
 
 OMAP CLOCK FRAMEWORK SUPPORT
 M:	Paul Walmsley <paul@pwsan.com>

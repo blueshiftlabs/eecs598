@@ -28,6 +28,7 @@
 #include <plat/board.h>
 #include <plat/mcbsp.h>
 #include <plat/mmc.h>
+#include <plat/iommu.h>
 #include <plat/dma.h>
 #include <plat/omap_hwmod.h>
 #include <plat/omap_device.h>
@@ -211,9 +212,21 @@ static struct platform_device omap3isp_device = {
 	.resource	= omap3isp_resources,
 };
 
+static struct omap_iommu_arch_data omap3_isp_iommu = {
+	.name = "isp",
+};
+
+struct isp_platform_data {
+	struct isp_v4l2_subdevs_group *subdevs;
+	void (*set_constraints)(struct isp_device *isp, bool enable);
+};
+static struct isp_platform_data bogus_isp_pdata;
+
 int omap3_init_camera(struct isp_platform_data *pdata)
 {
 	omap3isp_device.dev.platform_data = pdata;
+	omap3isp_device.dev.archdata.iommu = &omap3_isp_iommu;
+
 	return platform_device_register(&omap3isp_device);
 }
 
@@ -704,6 +717,7 @@ static int __init omap2_init_devices(void)
 	omap_init_mcpdm();
 	omap_init_dmic();
 	omap_init_camera();
+	omap3_init_camera(&bogus_isp_pdata);
 	omap_init_mbox();
 	omap_init_mcspi();
 	omap_init_pmu();
