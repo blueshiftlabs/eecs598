@@ -455,7 +455,7 @@ static void *__alloc_from_pool(struct device *dev, size_t size,
 	if (!coherent_head.vm_start) {
 		printk(KERN_ERR "%s: coherent pool not initialised!\n",
 		       __func__);
-		dump_stack();
+		BUG();
 		return NULL;
 	}
 
