@@ -27,7 +27,7 @@ INITRD_PHYS := $(initrd_phys-y)
 
 export ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-targets := Image zImage xipImage bootpImage uImage
+targets := Image zImage xipImage bootpImage uImage ulgImage
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
 
@@ -64,10 +64,18 @@ quiet_cmd_uimage = UIMAGE  $@
 		   -C none -a $(LOADADDR) -e $(STARTADDR) \
 		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
 
+
+quiet_cmd_ulgimage = ULGIMAGE  $@
+      cmd_ulgimage = $(CONFIG_SHELL) $(MKIMAGE) -A arm -O linux -T kernel \
+		   -C none -a $(LOADADDR) -e $(STARTADDR) \
+		   -n 'Linux-$(KERNELRELEASE)' -d $< $@
+
+
 ifeq ($(CONFIG_ZBOOT_ROM),y)
 $(obj)/uImage: LOADADDR=$(CONFIG_ZBOOT_ROM_TEXT)
 else
 $(obj)/uImage: LOADADDR=$(ZRELADDR)
+$(obj)/ulgImage: LOADADDR=$(ZRELADDR)
 endif
 
 ifeq ($(CONFIG_THUMB2_KERNEL),y)
@@ -75,11 +83,17 @@ ifeq ($(CONFIG_THUMB2_KERNEL),y)
 $(obj)/uImage: STARTADDR=$(shell echo $(LOADADDR) | sed -e "s/.$$/1/")
 else
 $(obj)/uImage: STARTADDR=$(LOADADDR)
+$(obj)/ulgImage: STARTADDR=$(LOADADDR)
 endif
 
 $(obj)/uImage:	$(obj)/zImage FORCE
 	$(call if_changed,uimage)
 	@echo '  Image $@ is ready'
+
+$(obj)/ulgImage:  $(obj)/Image FORCE
+	$(call if_changed,ulgimage)
+	@echo '  Image $@ is ready'
+
 
 $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@

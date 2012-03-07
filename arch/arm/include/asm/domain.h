@@ -52,6 +52,9 @@
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_MMU
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
 #define set_domain(x)					\
 	do {						\
 	__asm__ __volatile__(				\
@@ -59,6 +62,7 @@
 	  : : "r" (x));					\
 	isb();						\
 	} while (0)
+#endif
 
 #define modify_domain(dom,type)					\
 	do {							\

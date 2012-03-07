@@ -88,16 +88,16 @@ unsigned int elf_hwcap;
 EXPORT_SYMBOL(elf_hwcap);
 
 
-#ifdef MULTI_CPU
+#if (defined MULTI_CPU) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct processor processor;
 #endif
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_tlb_fns cpu_tlb;
 #endif
-#ifdef MULTI_USER
+#if (defined MULTI_USER) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_user_fns cpu_user;
 #endif
-#ifdef MULTI_CACHE
+#if (defined MULTI_CACHE) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_cache_fns cpu_cache;
 #endif
 #ifdef CONFIG_OUTER_CACHE
@@ -199,10 +199,56 @@ static const char *proc_arch[] = {
 	"?(17)",
 };
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change do_get_cpu_architecture to pointer at
+ * the Guest's own function when it boots up.
+ */
+static int host_cpu_architecture(void)
+{
+
+	int cpu_arch;
+	if ((read_cpuid_id() & 0x0008f000) == 0) {
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	} else if ((read_cpuid_id() & 0x0008f000) == 0x00007000) {
+		cpu_arch = (read_cpuid_id() & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+	} else if ((read_cpuid_id() & 0x00080000) == 0x00000000) {
+		cpu_arch = (read_cpuid_id() >> 16) & 7;
+		if (cpu_arch)
+			cpu_arch += CPU_ARCH_ARMv3;
+	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+		unsigned int mmfr0;
+
+		/* Revised CPUID format. Read the Memory Model Feature
+		 * Register 0 and check for VMSAv7 or PMSAv7 */
+		asm("mrc    p15, 0, %0, c0, c1, 4"
+				: "=r" (mmfr0));
+		if ((mmfr0 & 0x0000000f) == 0x00000003 ||
+			(mmfr0 & 0x000000f0) == 0x00000030)
+			cpu_arch = CPU_ARCH_ARMv7;
+		else if ((mmfr0 & 0x0000000f) == 0x00000002 ||
+			(mmfr0 & 0x000000f0) == 0x00000020)
+			cpu_arch = CPU_ARCH_ARMv6;
+		else
+			cpu_arch = CPU_ARCH_UNKNOWN;
+	} else
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	return cpu_arch;
+
+}
+int (*do_get_cpu_architecture)(void) = host_cpu_architecture;
+#endif //CONFIG_ARM_LGUEST_GUEST
+
+
 int cpu_architecture(void)
 {
 	int cpu_arch;
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	cpu_arch = do_get_cpu_architecture();
+#else
 	if ((read_cpuid_id() & 0x0008f000) == 0) {
 		cpu_arch = CPU_ARCH_UNKNOWN;
 	} else if ((read_cpuid_id() & 0x0008f000) == 0x00007000) {
@@ -228,9 +274,11 @@ int cpu_architecture(void)
 			cpu_arch = CPU_ARCH_UNKNOWN;
 	} else
 		cpu_arch = CPU_ARCH_UNKNOWN;
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 	return cpu_arch;
 }
+EXPORT_SYMBOL(cpu_architecture);
 
 static void __init cacheid_init(void)
 {
@@ -286,16 +334,16 @@ static void __init setup_processor(void)
 
 	cpu_name = list->cpu_name;
 
-#ifdef MULTI_CPU
+#if (defined MULTI_CPU) || (defined CONFIG_ARM_LGUEST_GUEST)
 	processor = *list->proc;
 #endif
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_tlb = *list->tlb;
 #endif
-#ifdef MULTI_USER
+#if (defined MULTI_USER) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_user = *list->user;
 #endif
-#ifdef MULTI_CACHE
+#if (defined MULTI_CACHE) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_cache = *list->cache;
 #endif
 
@@ -696,6 +744,29 @@ static int __init customize_machine(void)
 }
 arch_initcall(customize_machine);
 
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change do_cpu_tcm_init and 
+ * do_early_trap_init to pointer at the Guest's own functions 
+ * when it boots up.
+ */
+static void host_cpu_tcm_init(void)
+{
+#ifdef CONFIG_SMP
+	smp_init_cpus();
+#endif
+
+	cpu_init();
+	tcm_init();
+}
+
+void (*do_cpu_tcm_init)(void) = host_cpu_tcm_init;
+void (*do_early_trap_init)(void) = early_trap_init;
+#endif
+
 void __init setup_arch(char **cmdline_p)
 {
 	struct tag *tags = (struct tag *)&init_tags;
@@ -746,12 +817,17 @@ void __init setup_arch(char **cmdline_p)
 	paging_init(mdesc);
 	request_standard_resources(&meminfo, mdesc);
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	do_cpu_tcm_init();
+#else
+
 #ifdef CONFIG_SMP
 	smp_init_cpus();
 #endif
 
 	cpu_init();
 	tcm_init();
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 	/*
 	 * Set up various architecture-specific pointers
@@ -767,7 +843,12 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	do_early_trap_init();
+#else
 	early_trap_init();
+#endif
 }
 
 

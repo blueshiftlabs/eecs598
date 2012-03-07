@@ -74,6 +74,10 @@ static inline void check_context(struct mm_struct *mm)
 
 #define destroy_context(mm)		do { } while(0)
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
+
 /*
  * This is called when "tsk" is about to enter lazy TLB mode.
  *
@@ -115,6 +119,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	}
 #endif
 }
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
 #define activate_mm(prev,next)	switch_mm(prev, next, NULL)

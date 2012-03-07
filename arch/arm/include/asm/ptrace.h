@@ -128,8 +128,13 @@ struct pt_regs {
 
 #ifdef __KERNEL__
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
+
 #define user_mode(regs)	\
 	(((regs)->ARM_cpsr & 0xf) == 0)
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 #ifdef CONFIG_ARM_THUMB
 #define thumb_mode(regs) \
@@ -142,8 +147,13 @@ struct pt_regs {
 	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
 	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
+
 #define processor_mode(regs) \
 	((regs)->ARM_cpsr & MODE_MASK)
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 #define interrupts_enabled(regs) \
 	(!((regs)->ARM_cpsr & PSR_I_BIT))

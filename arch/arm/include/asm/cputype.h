@@ -8,6 +8,9 @@
 #define CPUID_TCM	2
 #define CPUID_TLBTYPE	3
 
+#if (defined CONFIG_CPU_CP15) && (defined CONFIG_ARM_LGUEST_GUEST)
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
 #define CPUID_EXT_PFR0	"c1, 0"
 #define CPUID_EXT_PFR1	"c1, 1"
 #define CPUID_EXT_DFR0	"c1, 2"
@@ -22,8 +25,12 @@
 #define CPUID_EXT_ISAR3	"c2, 3"
 #define CPUID_EXT_ISAR4	"c2, 4"
 #define CPUID_EXT_ISAR5	"c2, 5"
+#endif
 
 #ifdef CONFIG_CPU_CP15
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else	//!CONFIG_ARM_LGUEST_GUEST
 #define read_cpuid(reg)							\
 	({								\
 		unsigned int __val;					\
@@ -42,6 +49,7 @@
 		    : "cc");						\
 		__val;							\
 	})
+#endif // CONFIG_ARM_LGUEST_GUEST	
 #else
 extern unsigned int processor_id;
 #define read_cpuid(reg) (processor_id)

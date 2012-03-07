@@ -251,7 +251,8 @@
 
 #ifndef __ASSEMBLY__
 
-#ifndef MULTI_CPU
+//#ifndef MULTI_CPU
+#if (!defined MULTI_CPU) && (!defined CONFIG_ARM_LGUEST_GUEST)
 #include <asm/cpu-single.h>
 #else
 #include <asm/cpu-multi32.h>
@@ -263,6 +264,10 @@
 
 #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
+
 #define cpu_get_pgd()	\
 	({						\
 		unsigned long pg;			\
@@ -271,7 +276,7 @@
 		pg &= ~0x3fff;				\
 		(pgd_t *)phys_to_virt(pg);		\
 	})
-
+#endif // CONFIG_ARM_LGUEST_GUEST
 #endif
 
 #endif /* __ASSEMBLY__ */

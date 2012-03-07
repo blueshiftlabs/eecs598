@@ -28,6 +28,7 @@
 #include <linux/ipc.h>
 #include <linux/uaccess.h>
 
+
 struct mmap_arg_struct {
 	unsigned long addr;
 	unsigned long len;
@@ -188,6 +189,7 @@ asmlinkage int sys_vfork(struct pt_regs *regs)
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->ARM_sp, regs, 0, NULL, NULL);
 }
 
+
 /* sys_execve() executes a new program.
  * This is called indirectly via a small wrapper
  */
@@ -207,6 +209,16 @@ out:
 	return error;
 }
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Use a function pointer to cal  a function.
+ * The Guest' kernel  will change do_ret_to_user to pointer at
+ * the Guest's own function when it boots up.
+ */
+extern void ret_to_user(void);
+void (* do_ret_to_user)(void) = ret_to_user;
+#endif
+
 int kernel_execve(const char *filename, char *const argv[], char *const envp[])
 {
 	struct pt_regs regs;
@@ -222,6 +234,23 @@ int kernel_execve(const char *filename, char *const argv[], char *const envp[])
 	 * Save argc to the register structure for userspace.
 	 */
 	regs.ARM_r0 = ret;
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	asm(    "add    r0, %0, %1\n\t"
+			"mov    r1, %2\n\t"
+			"mov    r2, %3\n\t"
+			"bl memmove\n\t"    /* copy regs to top of stack */
+			"mov    r8, #0\n\t" /* not a syscall */
+			"mov    r9, %0\n\t" /* thread structure */
+			"mov    sp, r0\n\t" /* reposition stack pointer */
+			:
+			: "r" (current_thread_info()),
+			"Ir" (THREAD_START_SP - sizeof(regs)),
+			"r" (&regs),
+			"Ir" (sizeof(regs))
+			: "r0", "r1", "r2", "r3", "ip", "lr", "memory");
+			do_ret_to_user();
+#else
 
 	/*
 	 * We were successful.  We won't be returning to our caller, but
@@ -241,7 +270,7 @@ int kernel_execve(const char *filename, char *const argv[], char *const envp[])
 		  "r" (&regs),
 		  "Ir" (sizeof(regs))
 		: "r0", "r1", "r2", "r3", "ip", "lr", "memory");
-
+#endif
  out:
 	return ret;
 }

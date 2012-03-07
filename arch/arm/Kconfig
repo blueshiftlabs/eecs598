@@ -836,6 +836,8 @@ source "arch/arm/mach-versatile/Kconfig"
 
 source "arch/arm/mach-w90x900/Kconfig"
 
+source "arch/arm/mach-armlguest/Kconfig"
+
 # Definitions to make life easier
 config ARCH_ACORN
 	bool

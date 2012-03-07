@@ -236,6 +236,14 @@ SECTIONS
 	BSS_SECTION(0, 0, 0)
 	_end = .;
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	/* This section contains the offsets of the Guest's exception vectors and handlers in the Image */
+	.lguest.guest.vectors.address :
+	{
+		*(.lguest.guest.vectors.address)
+	}
+#endif
+
 	STABS_DEBUG
 	.comment 0 : { *(.comment) }
 

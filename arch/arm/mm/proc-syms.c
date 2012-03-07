@@ -15,14 +15,14 @@
 #include <asm/tlbflush.h>
 #include <asm/page.h>
 
-#ifndef MULTI_CPU
+#if (!defined MULTI_CPU) && (!defined CONFIG_ARM_LGUEST_GUEST)
 EXPORT_SYMBOL(cpu_dcache_clean_area);
 EXPORT_SYMBOL(cpu_set_pte_ext);
 #else
 EXPORT_SYMBOL(processor);
 #endif
 
-#ifndef MULTI_CACHE
+#if (!defined MULTI_CACHE) && (!defined CONFIG_ARM_LGUEST_GUEST)
 EXPORT_SYMBOL(__cpuc_flush_kern_all);
 EXPORT_SYMBOL(__cpuc_flush_user_all);
 EXPORT_SYMBOL(__cpuc_flush_user_range);
@@ -33,7 +33,7 @@ EXPORT_SYMBOL(cpu_cache);
 #endif
 
 #ifdef CONFIG_MMU
-#ifndef MULTI_USER
+#if (!defined MULTI_USER) && (!defined CONFIG_ARM_LGUEST_GUEST)
 EXPORT_SYMBOL(__cpu_clear_user_highpage);
 EXPORT_SYMBOL(__cpu_copy_user_highpage);
 #else
@@ -46,6 +46,6 @@ EXPORT_SYMBOL(cpu_user);
  * no modules do.  We export this for "loadkernel" support
  * (booting a new kernel from within a running kernel.)
  */
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 EXPORT_SYMBOL(cpu_tlb);
 #endif

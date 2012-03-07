@@ -436,6 +436,9 @@ extern void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
 #define ARCH_IMPLEMENTS_FLUSH_DCACHE_PAGE 1
 extern void flush_dcache_page(struct page *);
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
 static inline void __flush_icache_all(void)
 {
 #ifdef CONFIG_ARM_ERRATA_411920
@@ -447,6 +450,7 @@ static inline void __flush_icache_all(void)
 	    : "r" (0));
 #endif
 }
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 #define ARCH_HAS_FLUSH_ANON_PAGE
 static inline void flush_anon_page(struct vm_area_struct *vma,

@@ -259,7 +259,14 @@ extern struct page *empty_zero_page;
 #define pfn_pte(pfn,prot)	(__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot)))
 
 #define pte_none(pte)		(!pte_val(pte))
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
+
 #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
+#endif
+
 #define pte_page(pte)		(pfn_to_page(pte_pfn(pte)))
 #define pte_offset_kernel(dir,addr)	(pmd_page_vaddr(*(dir)) + __pte_index(addr))
 
@@ -278,9 +285,14 @@ extern struct page *empty_zero_page;
 
 #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,pte,ext)
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
+
 #define set_pte_at(mm,addr,ptep,pteval) do { \
 	set_pte_ext(ptep, pteval, (addr) >= TASK_SIZE ? 0 : PTE_EXT_NG); \
  } while (0)
+#endif
 
 /*
  * The following only work if pte_present() is true.
@@ -326,6 +338,10 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 #define pmd_present(pmd)	(pmd_val(pmd))
 #define pmd_bad(pmd)		(pmd_val(pmd) & 2)
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
+
 #define copy_pmd(pmdpd,pmdps)		\
 	do {				\
 		pmdpd[0] = pmdps[0];	\
@@ -339,6 +355,7 @@ static inline pte_t pte_mkspecial(pte_t pte) { return pte; }
 		pmdp[1] = __pmd(0);	\
 		clean_pmd_entry(pmdp);	\
 	} while (0)
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 static inline pte_t *pmd_page_vaddr(pmd_t pmd)
 {

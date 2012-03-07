@@ -206,6 +206,40 @@ void machine_restart(char *cmd)
 	arm_pm_restart(reboot_mode, cmd);
 }
 
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change do_show_co_regs to pointer at
+ * the Guest's own function when it boots up.
+ */
+static void host_show_co_regs(char *buf)
+{
+#ifdef CONFIG_CPU_CP15
+	unsigned int ctrl;
+
+	buf[0] = '\0';
+#ifdef CONFIG_CPU_CP15_MMU
+	{
+		unsigned int transbase, dac;
+		asm("mrc p15, 0, %0, c2, c0\n\t"
+				"mrc p15, 0, %1, c3, c0\n"
+				: "=r" (transbase), "=r" (dac));
+		snprintf(buf, sizeof(buf), "  Table: %08x  DAC: %08x",
+                transbase, dac);
+	}
+#endif
+	asm("mrc p15, 0, %0, c1, c0\n" : "=r" (ctrl));
+
+	printk("Control: %08x%s\n", ctrl, buf);
+#endif
+}
+
+void (* do_show_co_regs)(char *buf) = host_show_co_regs;
+#endif //CONFIG_ARM_LGUEST_GUEST
+
+
 void __show_regs(struct pt_regs *regs)
 {
 	unsigned long flags;
@@ -245,6 +279,11 @@ void __show_regs(struct pt_regs *regs)
 		processor_modes[processor_mode(regs)],
 		isa_modes[isa_mode(regs)],
 		get_fs() == get_ds() ? "kernel" : "user");
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	do_show_co_regs(buf);
+#else //CONFIG_ARM_LGUEST_GUEST
+
 #ifdef CONFIG_CPU_CP15
 	{
 		unsigned int ctrl;
@@ -265,6 +304,8 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
+
+#endif //CONFIG_ARM_LGUEST_GUEST
 }
 
 void show_regs(struct pt_regs * regs)
@@ -305,6 +346,16 @@ void release_thread(struct task_struct *dead_task)
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Use a function pointer to call the function.
+ * The Guest' kernel  will change do_ret_from_fork to pointer at
+ * the Guest's own function when it boots up.
+ */
+void (* do_ret_from_fork)(void) = ret_from_fork;
+#endif
+
+
 int
 copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	    unsigned long stk_sz, struct task_struct *p, struct pt_regs *regs)
@@ -318,7 +369,11 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
 
 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
 	thread->cpu_context.sp = (unsigned long)childregs;
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	thread->cpu_context.pc = (unsigned long)do_ret_from_fork;
+#else
 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
+#endif
 
 	if (clone_flags & CLONE_SETTLS)
 		thread->tp_value = regs->ARM_r3;
@@ -383,6 +438,20 @@ asm(	".section .text\n"
 #define kernel_thread_exit	do_exit
 #endif
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change kernel_thread_cpsr to pointer at
+ * the Guest's own function when it boots up.
+ */
+static unsigned long host_kernel_thread_cpsr(void)
+{
+	return SVC_MODE | PSR_ENDSTATE | PSR_ISETSTATE;
+}
+
+unsigned long (* kernel_thread_cpsr)(void) = host_kernel_thread_cpsr;
+#endif
 /*
  * Create a kernel thread.
  */
@@ -396,7 +465,11 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	regs.ARM_r2 = (unsigned long)fn;
 	regs.ARM_r3 = (unsigned long)kernel_thread_exit;
 	regs.ARM_pc = (unsigned long)kernel_thread_helper;
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	regs.ARM_cpsr = kernel_thread_cpsr();
+#else
 	regs.ARM_cpsr = SVC_MODE | PSR_ENDSTATE | PSR_ISETSTATE;
+#endif
 
 	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }

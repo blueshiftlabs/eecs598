@@ -167,6 +167,10 @@ extern unsigned int user_debug;
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 
+
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
 static inline unsigned int get_cr(void)
 {
 	unsigned int val;
@@ -180,6 +184,7 @@ static inline void set_cr(unsigned int val)
 	  : : "r" (val) : "cc");
 	isb();
 }
+#endif
 
 #ifndef CONFIG_SMP
 extern void adjust_cr(unsigned long mask, unsigned long set);
@@ -189,6 +194,9 @@ extern void adjust_cr(unsigned long mask, unsigned long set);
 #define CPACC_SVC(n)		(1 << (n * 2))
 #define CPACC_DISABLE(n)	(0 << (n * 2))
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
 static inline unsigned int get_copro_access(void)
 {
 	unsigned int val;
@@ -203,7 +211,7 @@ static inline void set_copro_access(unsigned int val)
 	  : : "r" (val) : "cc");
 	isb();
 }
-
+#endif
 /*
  * switch_mm() may do a full cache flush over the context switch,
  * so enable interrupts over the context switch to avoid high
@@ -211,6 +219,9 @@ static inline void set_copro_access(unsigned int val)
  */
 #define __ARCH_WANT_INTERRUPTS_ON_CTXSW
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
 /*
  * switch_to(prev, next) should switch from task `prev' to `next'
  * `prev' will never be the same as `next'.  schedule() itself
@@ -222,6 +233,7 @@ extern struct task_struct *__switch_to(struct task_struct *, struct thread_info 
 do {									\
 	last = __switch_to(prev,task_thread_info(prev), task_thread_info(next));	\
 } while (0)
+#endif
 
 #if defined(CONFIG_CPU_SA1100) || defined(CONFIG_CPU_SA110)
 /*

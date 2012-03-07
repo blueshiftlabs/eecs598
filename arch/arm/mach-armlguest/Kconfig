@@ -1,0 +1,36 @@
+config MACH_ARMLGUEST
+	bool "ARM Lguest Virtual Machine"
+	---help---
+	This is the ARM Lguest Virtual Machine.
+	If ARM_LGUEST_GUEST, this option must be YES
+ 
+config ARM_LGUEST_GUEST
+	bool "ARM Lguest guest support"
+	select VIRTIO
+	select VIRTIO_RING
+	select VIRTIO_CONSOLE
+	select MACH_ARMLGUEST
+	---help---
+	Lguest is a tiny in-kernel hypervisor.  Selecting this will
+	allow your kernel to boot under lguest.
+	If in doubt, say N.
+
+	If you say Y here, make sure you say Y (or M) to the virtio block
+	and net drivers which lguest needs.
+
+
+config ARM_LGUEST
+	tristate "ARM Linux hypervisor example code"
+	depends on EXPERIMENTAL && EVENTFD
+	select HVC_DRIVER
+	---help---
+	This is a very simple module which allows you to run
+	multiple instances of the same Linux kernel, using the
+	"lguest" command found in the Documentation/arm/lguest 
+	directory. See Documentation/lguest/lguest.txt and 
+	Documentation/lguest/arm/lguest_arm.txt		
+
+	If unsure, say N.  If curious, say M.  If masochistic, say Y.
+
+source drivers/virtio/Kconfig
+

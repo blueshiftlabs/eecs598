@@ -220,7 +220,8 @@ struct cpu_tlb_fns {
 /*
  * Select the calling method
  */
-#ifdef MULTI_TLB
+//#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 
 #define __cpu_flush_user_tlb_range	cpu_tlb.flush_user_range
 #define __cpu_flush_kern_tlb_range	cpu_tlb.flush_kern_range
@@ -314,6 +315,9 @@ extern struct cpu_tlb_fns cpu_tlb;
 
 #define tlb_flag(f)	((always_tlb_flags & (f)) || (__tlb_flag & possible_tlb_flags & (f)))
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
 static inline void local_flush_tlb_all(void)
 {
 	const int zero = 0;
@@ -497,10 +501,11 @@ static inline void clean_pmd_entry(pmd_t *pmd)
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");
 }
-
 #undef tlb_flag
 #undef always_tlb_flags
 #undef possible_tlb_flags
+#endif // CONFIG_ARM_LGUEST_GUEST
+
 
 /*
  * Convert calls to our calling convention.

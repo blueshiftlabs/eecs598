@@ -5,6 +5,9 @@
 
 #include <asm/ptrace.h>
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else
 /*
  * CPU interrupt mask handling.
  */
@@ -122,6 +125,7 @@
 	:							\
 	: "r" (x)						\
 	: "memory", "cc")
+#endif //CONFIG_ARM_LGUEST_GUEST
 
 #define raw_irqs_disabled_flags(flags)	\
 ({					\

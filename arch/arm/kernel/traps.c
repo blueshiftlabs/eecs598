@@ -443,6 +443,31 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 	up_read(&mm->mmap_sem);
 }
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change do_set_tls to pointer at
+ * the Guest's own function when it boots up.
+ */
+static void host_set_tls(unsigned long tls)
+{
+#if defined(CONFIG_HAS_TLS_REG)
+	asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (tls) );
+#elif !defined(CONFIG_TLS_REG_EMUL)
+	/*
+	 * User space must never try to access this directly.
+	 * Expect your app to break eventually if you do so.
+	 * The user helper at 0xffff0fe0 must be used instead.
+	 * (see entry-armv.S for details)
+	 */
+	*((unsigned int *)0xffff0ff0) = tls;
+#endif
+}
+void (* do_set_tls)(unsigned long tls) = host_set_tls;
+#endif
+
+
 /*
  * Handle all unrecognised system calls.
  *  0x9f0000 - 0x9fffff are some more esoteric system calls
@@ -503,6 +528,10 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 
 	case NR(set_tls):
 		thread->tp_value = regs->ARM_r0;
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	do_set_tls(regs->ARM_r0);
+#else
+
 #if defined(CONFIG_HAS_TLS_REG)
 		asm ("mcr p15, 0, %0, c13, c0, 3" : : "r" (regs->ARM_r0) );
 #elif !defined(CONFIG_TLS_REG_EMUL)
@@ -514,6 +543,8 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		 */
 		*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
 #endif
+
+#endif //CONFIG_ARM_LGUEST_GUEST
 		return 0;
 
 #ifdef CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG

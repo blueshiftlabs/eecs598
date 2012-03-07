@@ -106,12 +106,17 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
 	__free_page(pte);
 }
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+#include <asm/lguest_privileged_ops.h>
+#else   //!CONFIG_ARM_LGUEST_GUEST
+
 static inline void __pmd_populate(pmd_t *pmdp, unsigned long pmdval)
 {
 	pmdp[0] = __pmd(pmdval);
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
 	flush_pmd_entry(pmdp);
 }
+#endif
 
 /*
  * Populate the pmdp entry with a pointer to the pte.  This pmd is part

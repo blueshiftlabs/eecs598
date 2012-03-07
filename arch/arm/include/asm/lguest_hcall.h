@@ -1,0 +1,85 @@
+/* Architecture specific portion of the lguest hypercalls */
+/* arch/arm/include/asm/lguest_hcall.h */
+#ifndef _ASM_ARM_LGUEST_HCALL_H
+#define _ASM_ARM_LGUEST_HCALL_H
+
+#define HYPERCALL_NUMBER	0x009fffff
+#define HYPERCALL_START		0
+
+#define LHCALL_NOTIFY               (HYPERCALL_START + 0)
+#define LHCALL_RESET                (HYPERCALL_START + 1)
+#define LHCALL_SHUTDOWN             (HYPERCALL_START + 2)
+#define LHCALL_HALT                 (HYPERCALL_START + 3)
+#define LHCALL_IDLE                 (HYPERCALL_START + 4)      
+#define LHCALL_GUEST_BUSY_WAIT      (HYPERCALL_START + 5)  
+#define LGUEST_SHUTDOWN_POWEROFF    1
+#define LGUEST_SHUTDOWN_RESTART     2
+
+
+
+
+#define LHCALL_FLUSH_KERNEL_TLB				(HYPERCALL_START + 10)
+#define LHCALL_FLUSH_USER_TLB				(HYPERCALL_START + 11)
+#define LHCALL_LOCAL_FLUSH_TLB_ALL			(HYPERCALL_START + 12)
+#define LHCALL_LOCAL_FLUSH_TLB_MM			(HYPERCALL_START + 13)
+#define LHCALL_LOCAL_FLUSH_TLB_PAGE			(HYPERCALL_START + 14)
+#define LHCALL_LOCAL_FLUSH_TLB_KERNEL_PAGE  (HYPERCALL_START + 15)
+
+
+#define LHCALL_FLUSH_CACHE_KERNEL			(HYPERCALL_START + 21)
+#define LHCALL_FLUSH_CACHE_USER				(HYPERCALL_START + 22)
+#define LHCALL_FLUSH_CACHE_USER_RANGE		(HYPERCALL_START + 23)
+#define LHCALL_COHERENT_CACHE_KERNEL_RANGE	(HYPERCALL_START + 24)
+#define LHCALL_COHERENT_CACHE_USER_RANGE	(HYPERCALL_START + 25)
+#define LHCALL_FLUSH_DCACHE_KERNEL_AREA		(HYPERCALL_START + 26)
+#define LHCALL_DMA_INV_CACHE_RANGE			(HYPERCALL_START + 27)
+#define LHCALL_DMA_CLEAN_CACHE_RANGE		(HYPERCALL_START + 28)
+#define LHCALL_DMA_FLUSH_CACHE_RANGE		(HYPERCALL_START + 29)
+#define LHCALL_DCACHE_CLEAN_AREA			(HYPERCALL_START + 30)
+#define LHCALL_FLUSH_ICACHE_ALL             (HYPERCALL_START + 31)
+#define LHCALL_CLERA_USER_HIGHPAGE_NONALIASING  (HYPERCALL_START + 32)
+#define LHCALL_COPY_USER_HIGHPAGE_NONALIASING   (HYPERCALL_START + 33)
+
+
+#define LHCALL_SET_TLS          (HYPERCALL_START + 41)
+#define LHCALL_SET_CLOCKEVENT   (HYPERCALL_START + 42)  
+#define LHCALL_SEND_INTERRUPTS  (HYPERCALL_START + 43)
+#define LHCALL_SET_DOMAIN       (HYPERCALL_START + 44)
+#define LHCALL_SET_CR           (HYPERCALL_START + 45)
+#define LHCALL_SET_COPRO        (HYPERCALL_START + 46)
+
+
+
+#define LHCALL_SWITCH_MM		(HYPERCALL_START + 51)	
+#define LHCALL_SWITCH_TO		(HYPERCALL_START + 52)	
+#define LHCALL_CLEAN_PMD		(HYPERCALL_START + 53)
+#define LHCALL_FLUSH_PMD		(HYPERCALL_START + 54)	
+#define LHCALL_SET_PTE			(HYPERCALL_START + 55)
+#define LHCALL_SET_PGD			(HYPERCALL_START + 56)
+#define LHCALL_COPY_PMD         (HYPERCALL_START + 57)
+#define LHCALL_PMD_CLEAR        (HYPERCALL_START + 58)
+#define LHCALL_SET_PTE_EXT		(HYPERCALL_START + 59)
+
+
+
+
+
+
+#ifndef __ASSEMBLY__
+static inline void lguest_hypercall(void)
+{                                                    
+	__asm__ __volatile__(                           
+		"swi %0\r\n"
+		:                 
+		:"i"(HYPERCALL_NUMBER) :"cc");             
+}
+
+#define LGUEST_IRQS (NR_IRQS < 32 ? NR_IRQS: 32)
+
+#define LHCALL_RING_SIZE 64
+struct hcall_args {
+	unsigned long arg0, arg1, arg2, arg3, arg4;
+};
+
+#endif /* !__ASSEMBLY__ */
+#endif /* _ASM_ARM_LGUEST_HCALL_H */
