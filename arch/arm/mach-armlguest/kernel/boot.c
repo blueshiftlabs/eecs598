@@ -516,6 +516,44 @@ static void lguest_enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 }
 
 
+
+static DEFINE_SPINLOCK(cpu_asid_lock);
+/*
+ * Its native counter part is defined in linux/arch/arm/mm/context.c
+ */
+static void __lguest_new_context(struct mm_struct *mm)
+{
+	unsigned int asid;
+
+	spin_lock(&cpu_asid_lock);
+	asid = ++cpu_last_asid;
+	if (asid == 0)
+		asid = cpu_last_asid = ASID_FIRST_VERSION;
+
+	if (unlikely((asid & ~ASID_MASK) == 0)) {
+		asid = ++cpu_last_asid;
+	}
+	spin_unlock(&cpu_asid_lock);
+
+	cpumask_copy(mm_cpumask(mm), cpumask_of(smp_processor_id()));
+	mm->context.id = asid;
+}
+
+/*
+ * Its native counter part is defined in
+ * linux/arch/arm/include/asm/mmu_context.h
+ */
+static inline void lguest_check_context(struct mm_struct *mm)
+{
+	if (unlikely((mm->context.id ^ cpu_last_asid) >> ASID_BITS))
+		__lguest_new_context(mm);
+
+	if (unlikely(mm->context.kvm_seq != init_mm.context.kvm_seq))
+		__check_kvm_seq(mm);
+}
+
+
+
 /*
  * Its native counter part is defined in linux/arch/arm/include/asm/mmu_context.h
  * You can see that this function calls cpu_switch_mm, but actually 
@@ -528,7 +566,7 @@ lguest_switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	unsigned int cpu = smp_processor_id();
 
 	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
-		check_context(next);
+		lguest_check_context(next);
 		cpu_switch_mm(next->pgd, next);
 	}
 }

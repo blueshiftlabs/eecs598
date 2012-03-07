@@ -176,9 +176,6 @@ static unsigned long get_pmdval(pgd_t *pgd, unsigned long vaddr)
 /* Check if a PMD entry is valid.*/
 static unsigned long check_pmd(unsigned long value)
 {
-	if(pmd_none(value))
-		return 0;
-
 	if(((value & PMD_TYPE_MASK) == PMD_TYPE_FAULT) ||
 		((value & PMD_TYPE_MASK) == PMD_TYPE_MASK))
 		return 0;
@@ -328,7 +325,7 @@ bool guest_abort_handler(struct lg_cpu *cpu, unsigned long vaddr, unsigned long 
 {
 #define SECTION_TRANSLATION_FAULT	0x5
 #define PAGE_TRANSLATION_FAULT		0x7	
-//#define PAGE_PERMISSION_FAULT		0xf
+#define PAGE_PERMISSION_FAULT		0xf
 	pgd_t gpgd;
 	pgd_t *spgd;
 	unsigned long gpte_ptr;
@@ -436,6 +433,11 @@ bool guest_abort_handler(struct lg_cpu *cpu, unsigned long vaddr, unsigned long 
 		return false;
 	}
 
+	if((fsr == PAGE_PERMISSION_FAULT) && (pte_val(gpte) & L_PTE_USER)){
+		return false;
+	}
+
+    
 	/*
 	 * Check that the Guest PTE flags are OK, and the page number is below
 	 * the pfn_limit (ie. not mapping the Launcher binary).
@@ -527,11 +529,13 @@ static void release_pgd(pgd_t *spgd)
 		/* Zero out this page */
 		memset((void *)page, 0, PAGE_SIZE);
 		/* Now we can free the page of PTEs */
-		free_page((long)page);
+		free_page(page);
 		/* And zero out the PMD entry so we never release it twice. */
 		lguest_pmd_clear(pmd);
 	}
 }
+
+
 
 /*H:445
  * We saw flush_user_mappings() twice: once from the flush_user_mappings()
@@ -541,6 +545,9 @@ static void release_pgd(pgd_t *spgd)
 static void flush_user_mappings(struct lguest *lg, int idx)
 {
 	unsigned int i;
+
+	if(idx >= PTRS_PER_PGD)
+		return;	
 	/* Release every pgd entry up to the kernel's address. */
 	for (i = 0; i < pgd_index(TASK_SIZE); i++)
 		release_pgd(lg->pgdirs[idx].pgdir + i);
@@ -585,16 +592,25 @@ static unsigned int new_pgdir(struct lg_cpu *cpu,
 		if (!cpu->lg->pgdirs[next].pgdir)
 			next = cpu->cpu_pgd;
 		else {
-			unsigned int index = pgd_index(TASK_SIZE);
-			pgd_t *new_pgd;
-			pgd_t *cur_pgd;
-			memset(cpu->lg->pgdirs[next].pgdir, 0, PAGE_SIZE * 4);
+			unsigned int index = pgd_index(PAGE_OFFSET);
+			unsigned int index_end = pgd_index(cpu->lg->mem_size +  PAGE_OFFSET);
 
-			new_pgd = &cpu->lg->pgdirs[next].pgdir[index];
-			cur_pgd = &cpu->lg->pgdirs[cpu->cpu_pgd].pgdir[index];
+			memset((void *)(cpu->lg->pgdirs[next].pgdir), 0, PAGE_SIZE * 4);
+
 			
-			/* We copy all entries above TASK_SIZE from current page table */
-			memcpy((void *)new_pgd, (void *)cur_pgd, (sizeof(pgd_t) * (PTRS_PER_PGD - index)));
+			/* We copy the entries of the Switcher, Guest Vectors, direct mapped memory */
+			memcpy((void *)&cpu->lg->pgdirs[next].pgdir[index],
+				(void *)&cpu->lg->pgdirs[cpu->cpu_pgd].pgdir[index],
+				(sizeof(pgd_t) * (index_end - index)));
+
+			memcpy((void *)&cpu->lg->pgdirs[next].pgdir[SWITCHER_PGD_INDEX],
+				(void *)&cpu->lg->pgdirs[cpu->cpu_pgd].pgdir[SWITCHER_PGD_INDEX],
+				sizeof(pgd_t));
+
+			memcpy((void *)&cpu->lg->pgdirs[next].pgdir[pgd_index(GUEST_VECTOR_ADDRESS)],
+				(void *)&cpu->lg->pgdirs[cpu->cpu_pgd].pgdir[pgd_index(GUEST_VECTOR_ADDRESS)],
+				sizeof(pgd_t));
+
 			goto out;
 		}
 	}
@@ -680,18 +696,33 @@ void release_guest_nondirect_mapped_memory(struct lguest *lg)
 static void release_all_pagetables(struct lguest *lg)
 {
 	unsigned int i, j;
+    unsigned long linemap_end = lg->mem_size +  PAGE_OFFSET;
 
-	/* Every shadow pagetable this Guest has */
-	for (i = 0; i < ARRAY_SIZE(lg->pgdirs); i++)
+	/* Direct mapped PGD entries are shared by all tasks, so we release them first*/
+	for (i = 0; i < ARRAY_SIZE(lg->pgdirs); i++){
 		if (lg->pgdirs[i].pgdir) {
-			/* Every PGD entry except the Switcher and vectors */
-			for (j = 0; j < SWITCHER_PGD_INDEX; j++){
+			for (j = pgd_index(PAGE_OFFSET); j < pgd_index(linemap_end); j++){
 				release_pgd(lg->pgdirs[i].pgdir + j);
 			}
+			break;
+		}
+	}
+    
+	/* Every shadow pagetable this Guest has */
+	for (i = 0; i < ARRAY_SIZE(lg->pgdirs); i++){
+		if (lg->pgdirs[i].pgdir) {
+			/* Every PGD entry except the Switcher's, Guest Vectors', direct mapped memory's */
+			for (j = 0; j < pgd_index(PAGE_OFFSET); j++)
+				release_pgd(lg->pgdirs[i].pgdir + j);
+
+			for (j = pgd_index(linemap_end); j < SWITCHER_PGD_INDEX; j++)
+				release_pgd(lg->pgdirs[i].pgdir + j);
+
 			for (j = SWITCHER_PGD_INDEX + 1; j < PTRS_PER_PGD - 1; j++)
 				release_pgd(lg->pgdirs[i].pgdir + j);
 		}
-}
+	}
+ }
 
 
 
@@ -811,7 +842,7 @@ void guest_set_pgd(struct lg_cpu *cpu, unsigned long gpgdir, u32 idx, unsigned l
 	 * Entries of the Switcher and the Guest's exception vectors 
 	 * should not be changed during the Guest runs.
 	 */
-	if (idx == SWITCHER_PGD_INDEX || idx == (PTRS_PER_PGD -1))
+	if (idx == SWITCHER_PGD_INDEX || idx >= (PTRS_PER_PGD -1))
 		return;
 
 	/* 
@@ -988,10 +1019,10 @@ int init_guest_pagetable(struct lguest *lg)
 		} 
 
 		/* Get the Gest compressed ramdisk image size. if we use the ramdisk */
-        if(tagtype == ATAG_INITRD2){
+		if(tagtype == ATAG_INITRD2){
 			if(copy_from_user(&initrd_size, &t->u.initrd.size, sizeof(initrd_size)))
 				return -EFAULT;
-        }
+		}
 		
 		/* Get the next tag. */
 		t = (struct tag *)((__u32 *)(t) + hdrsize);
@@ -1008,11 +1039,11 @@ int init_guest_pagetable(struct lguest *lg)
 	lg->pgdirs[0].gpgdir = setup_gpagetables(lg, mem_size, initrd_size);
 	if (IS_ERR_VALUE(lg->pgdirs[0].gpgdir))
 		return lg->pgdirs[0].gpgdir;
-	lg->pgdirs[0].pgdir = (pgd_t *)__get_free_pages(GFP_KERNEL, 2);
+	lg->pgdirs[0].pgdir = (pgd_t *)__get_free_pages(GFP_KERNEL, 2); 
 	if (!lg->pgdirs[0].pgdir)
 		return -ENOMEM;
 
-	memset(lg->pgdirs[0].pgdir, 0, PAGE_SIZE << 2);
+	memset((void *)lg->pgdirs[0].pgdir, 0, PAGE_SIZE << 2);
 	
 	lg->mem_size = mem_size;
 
@@ -1043,8 +1074,12 @@ void free_guest_pagetable(struct lguest *lg)
 	/* Throw away all page table pages. */
 	release_all_pagetables(lg);
 	/* Now free the top levels: free_page() can handle 0 just fine. */
-	for (i = 0; i < ARRAY_SIZE(lg->pgdirs); i++)
-		free_pages((long)lg->pgdirs[i].pgdir, 2);
+	for (i = 0; i < ARRAY_SIZE(lg->pgdirs); i++){
+        if(lg->pgdirs[i].pgdir){
+            free_pages((unsigned long)lg->pgdirs[i].pgdir, 2);
+            lg->pgdirs[i].pgdir = NULL;
+        }
+    }
 }
 
 /*H:480
