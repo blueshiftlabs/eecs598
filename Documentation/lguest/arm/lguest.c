@@ -39,6 +39,7 @@
 #include <stddef.h>
 #include <signal.h>
 #include "linux/lguest_launcher.h"
+#include "linux/lguest_rpmsg.h"
 #include "linux/virtio_config.h"
 #include "linux/virtio_net.h"
 #include "linux/virtio_blk.h"
@@ -1801,6 +1802,79 @@ static void setup_block_file(const char *filename)
 		++devices.device_num, le64_to_cpu(conf.capacity));
 }
 
+static void rpmsg_handle_rx(struct virtqueue *vq)
+{
+	int len;
+	int fd = (int)vq->dev->priv;
+	unsigned int head, in_num, out_num;
+	struct iovec iov[vq->vring.num];
+
+	/* Make sure there's a descriptor available. */
+	head = wait_for_vq_desc(vq, iov, &out_num, &in_num);
+	if (out_num)
+		errx(1, "Output buffers in rpmsg in queue?");
+
+	/* Read into it.  This is where we usually wait. */
+	len = readv(fd, iov, in_num);
+	if (len <= 0) {
+		/* Ran out of input? */
+		warnx("Failed to get rpmsg input, ignoring rpmsg.");
+		/*
+		 * For simplicity, dying threads kill the whole Launcher.  So
+		 * just nap here.
+		 */
+		for (;;)
+			pause();
+	}
+
+	/* Tell the Guest we used a buffer. */
+	add_used_and_trigger(vq, head, len);
+}
+
+static void rpmsg_handle_tx(struct virtqueue *vq)
+{
+	unsigned int head, out, in;
+	int fd = (int)vq->dev->priv;
+	struct iovec iov[vq->vring.num];
+
+	/* We usually wait in here, for the Guest to give us something. */
+	head = wait_for_vq_desc(vq, iov, &out, &in);
+	if (in)
+		errx(1, "Input buffers in rpmsg output queue?");
+
+	int len = writev(fd, iov, out);
+	if (len <= 0)
+		err(1, "Write to rpmsg gave %i", len);
+
+	/*
+	 * We're finished with that buffer: if we're going to sleep,
+	 * wait_for_vq_desc() will prod the Guest with an interrupt.
+	 */
+	add_used(vq, head, 0);
+}
+
+static void setup_rpmsg_dev(const char *channel)
+{
+	struct device *dev;
+	char channel_name[RPMSG_NAME_SIZE];
+	int fd;
+
+	dev = new_device("rpmsg", VIRTIO_ID_RPMSG);
+
+	add_virtqueue(dev, VIRTQUEUE_NUM, rpmsg_handle_rx);
+	add_virtqueue(dev, VIRTQUEUE_NUM, rpmsg_handle_tx);
+
+	fd = open_or_die("/dev/rpmsg", O_RDWR);
+	dev->priv = (void*)fd;
+	strncpy(channel_name, channel, RPMSG_NAME_SIZE);
+	if (ioctl(fd, LGR_IOCCONNECT, channel_name)) {
+		perror("connecting /dev/rpmsg");
+		exit(1);
+	}
+
+	add_feature(dev, VIRTIO_RPMSG_F_NS);
+}
+
 /*L:211
  * Our random number generator device reads from /dev/random into the Guest's
  * input buffers.  The usual case is that the Guest doesn't want random numbers
@@ -1927,6 +2001,7 @@ static struct option opts[] = {
 	{ "tunnet", 1, NULL, 't' },
 	{ "block", 1, NULL, 'b' },
 	{ "rng", 0, NULL, 'r' },
+	{ "rpmsg", 1, NULL, 'm' },
 	{ "initrd", 1, NULL, 'i' },
 	{ NULL },
 };
@@ -1999,6 +2074,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'b':
 			setup_block_file(optarg);
+			break;
+		case 'm':
+			setup_rpmsg_dev(optarg);
 			break;
 		case 'r':
 			setup_rng();
