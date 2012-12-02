@@ -5,6 +5,7 @@
 obj-$(CONFIG_ARM_LGUEST)   += lg.o
 lg-y = arm/init.o arm/hypercalls.o arm/page_tables.o arm/interrupts.o	\
 		arm/run_guest.o arm/switcher.o	lguest_user.o
+obj-$(CONFIG_ARM_LGUEST) += lguest_rpmsg.o
 
 
 Preparation Preparation!: PREFIX=P

@@ -9,6 +9,7 @@ config ARM_LGUEST_GUEST
 	select VIRTIO
 	select VIRTIO_RING
 	select VIRTIO_CONSOLE
+	select RPMSG
 	select MACH_ARMLGUEST
 	---help---
 	Lguest is a tiny in-kernel hypervisor.  Selecting this will
@@ -23,6 +24,9 @@ config ARM_LGUEST
 	tristate "ARM Linux hypervisor example code"
 	depends on EXPERIMENTAL && EVENTFD
 	select HVC_DRIVER
+	select VIRTIO
+	select VIRTIO_RING
+	select RPMSG
 	---help---
 	This is a very simple module which allows you to run
 	multiple instances of the same Linux kernel, using the
