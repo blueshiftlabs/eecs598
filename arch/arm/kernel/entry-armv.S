@@ -25,6 +25,7 @@
 #include <asm/unistd.h>
 #include <asm/tls.h>
 #include <asm/system.h>
+#include <asm/lguest-native.h>
 
 #include "entry-header.S"
 #include <asm/entry-macro-multi.S>
@@ -692,7 +693,7 @@ ENDPROC(ret_from_exception)
  * r0 = previous task_struct, r1 = previous thread_info, r2 = next thread_info
  * previous and next are guaranteed not to be the same.
  */
-ENTRY(__switch_to)
+ENTRY(LGUEST_NATIVE(__switch_to))
  UNWIND(.fnstart	)
  UNWIND(.cantunwind	)
 	add	ip, r1, #TI_CPU_SAVE
@@ -728,7 +729,7 @@ ENTRY(__switch_to)
  THUMB(	ldr	sp, [ip], #4		   )
  THUMB(	ldr	pc, [ip]		   )
  UNWIND(.fnend		)
-ENDPROC(__switch_to)
+ENDPROC(LGUEST_NATIVE(__switch_to))
 
 	__INIT
 

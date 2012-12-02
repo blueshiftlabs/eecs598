@@ -16,7 +16,7 @@
  */
 ENTRY(__cpu_suspend)
 	stmfd	sp!, {r4 - r11, lr}
-#ifdef MULTI_CPU
+#if defined(MULTI_CPU) || defined(CONFIG_ARM_LGUEST_GUEST)
 	ldr	r10, =processor
 	ldr	r4, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
 #else

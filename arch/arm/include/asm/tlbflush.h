@@ -13,6 +13,7 @@
 #ifdef CONFIG_MMU
 
 #include <asm/glue.h>
+#include <asm/lguest-native.h>
 
 #define TLB_V3_PAGE	(1 << 0)
 #define TLB_V4_U_PAGE	(1 << 1)
@@ -224,7 +225,7 @@ struct cpu_tlb_fns {
 /*
  * Select the calling method
  */
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 
 #define __cpu_flush_user_tlb_range	cpu_tlb.flush_user_range
 #define __cpu_flush_kern_tlb_range	cpu_tlb.flush_kern_range
@@ -318,7 +319,7 @@ extern struct cpu_tlb_fns cpu_tlb;
 
 #define tlb_flag(f)	((always_tlb_flags & (f)) || (__tlb_flag & possible_tlb_flags & (f)))
 
-static inline void local_flush_tlb_all(void)
+static inline void LGUEST_NATIVE(local_flush_tlb_all) (void)
 {
 	const int zero = 0;
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
@@ -342,8 +343,9 @@ static inline void local_flush_tlb_all(void)
 		isb();
 	}
 }
+lguest_define_hook(local_flush_tlb_all);
 
-static inline void local_flush_tlb_mm(struct mm_struct *mm)
+static inline void LGUEST_NATIVE(local_flush_tlb_mm) (struct mm_struct *mm)
 {
 	const int zero = 0;
 	const int asid = ASID(mm);
@@ -380,9 +382,10 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
 	if (tlb_flag(TLB_BARRIER))
 		dsb();
 }
+lguest_define_hook(local_flush_tlb_mm);
 
-static inline void
-local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+static inline void LGUEST_NATIVE(local_flush_tlb_page)
+(struct vm_area_struct *vma, unsigned long uaddr)
 {
 	const int zero = 0;
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
@@ -421,8 +424,10 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
 	if (tlb_flag(TLB_BARRIER))
 		dsb();
 }
+lguest_define_hook(local_flush_tlb_page);
 
-static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+static inline void LGUEST_NATIVE(local_flush_tlb_kernel_page)
+(unsigned long kaddr)
 {
 	const int zero = 0;
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
@@ -457,6 +462,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
 		isb();
 	}
 }
+lguest_define_hook(local_flush_tlb_kernel_page);
 
 /*
  *	flush_pmd_entry
@@ -471,7 +477,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
  *	these operations.  This is typically used when we are removing
  *	PMD entries.
  */
-static inline void flush_pmd_entry(void *pmd)
+static inline void LGUEST_NATIVE(flush_pmd_entry) (void *pmd)
 {
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
@@ -486,8 +492,9 @@ static inline void flush_pmd_entry(void *pmd)
 	if (tlb_flag(TLB_WB))
 		dsb();
 }
+lguest_define_hook(flush_pmd_entry);
 
-static inline void clean_pmd_entry(void *pmd)
+static inline void LGUEST_NATIVE(clean_pmd_entry) (void *pmd)
 {
 	const unsigned int __tlb_flag = __cpu_tlb_flags;
 
@@ -499,6 +506,7 @@ static inline void clean_pmd_entry(void *pmd)
 		asm("mcr	p15, 1, %0, c15, c9, 1  @ L2 flush_pmd"
 			: : "r" (pmd) : "cc");
 }
+lguest_define_hook(clean_pmd_entry);
 
 #undef tlb_flag
 #undef always_tlb_flags

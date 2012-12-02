@@ -18,6 +18,7 @@
 #include <asm/cacheflush.h>
 #include <asm/cachetype.h>
 #include <asm/proc-fns.h>
+#include <asm/lguest-native.h>
 
 void __check_kvm_seq(struct mm_struct *mm);
 
@@ -93,10 +94,11 @@ static inline void check_context(struct mm_struct *mm)
  *
  * tsk->mm will be NULL
  */
-static inline void
-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+static inline void LGUEST_NATIVE(enter_lazy_tlb)
+(struct mm_struct *mm, struct task_struct *tsk)
 {
 }
+lguest_define_hook(enter_lazy_tlb);
 
 /*
  * This is the actual mm switch as far as the scheduler
@@ -104,9 +106,8 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
  * calling the CPU specific function when the mm hasn't
  * actually changed.
  */
-static inline void
-switch_mm(struct mm_struct *prev, struct mm_struct *next,
-	  struct task_struct *tsk)
+static inline void LGUEST_NATIVE(switch_mm)
+(struct mm_struct *prev, struct mm_struct *next, struct task_struct *tsk)
 {
 #ifdef CONFIG_MMU
 	unsigned int cpu = smp_processor_id();
@@ -129,6 +130,7 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	}
 #endif
 }
+lguest_define_hook(switch_mm);
 
 #define deactivate_mm(tsk,mm)	do { } while (0)
 #define activate_mm(prev,next)	switch_mm(prev, next, NULL)

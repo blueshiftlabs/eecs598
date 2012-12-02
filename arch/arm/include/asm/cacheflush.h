@@ -16,6 +16,7 @@
 #include <asm/shmparam.h>
 #include <asm/cachetype.h>
 #include <asm/outercache.h>
+#include <asm/lguest-native.h>
 
 #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 
@@ -113,7 +114,7 @@ struct cpu_cache_fns {
 /*
  * Select the calling method
  */
-#ifdef MULTI_CACHE
+#if defined(MULTI_CACHE) || defined(CONFIG_ARM_LGUEST_GUEST)
 
 extern struct cpu_cache_fns cpu_cache;
 
@@ -199,10 +200,11 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
 #define __flush_icache_preferred	__flush_icache_all_generic
 #endif
 
-static inline void __flush_icache_all(void)
+static inline void LGUEST_NATIVE(__flush_icache_all)(void)
 {
 	__flush_icache_preferred();
 }
+lguest_define_hook(__flush_icache_all);
 
 #define flush_cache_all()		__cpuc_flush_kern_all()
 

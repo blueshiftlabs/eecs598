@@ -38,6 +38,7 @@
 #include <asm/system.h>
 #include <asm/thread_notify.h>
 #include <asm/stacktrace.h>
+#include <asm/lguest-native.h>
 #include <asm/mach/time.h>
 
 #ifdef CONFIG_CC_STACKPROTECTOR
@@ -256,6 +257,30 @@ void machine_restart(char *cmd)
 	arm_pm_restart(reboot_mode, cmd);
 }
 
+
+void LGUEST_NATIVE(show_coproc_regs) (char *buf)
+{
+#ifdef CONFIG_CPU_CP15
+	unsigned int ctrl;
+
+	buf[0] = '\0';
+#ifdef CONFIG_CPU_CP15_MMU
+	{
+		unsigned int transbase, dac;
+		asm("mrc p15, 0, %0, c2, c0\n\t"
+				"mrc p15, 0, %1, c3, c0\n"
+				: "=r" (transbase), "=r" (dac));
+		snprintf(buf, sizeof(buf), "  Table: %08x  DAC: %08x",
+                transbase, dac);
+	}
+#endif
+	asm("mrc p15, 0, %0, c1, c0\n" : "=r" (ctrl));
+
+	printk("Control: %08x%s\n", ctrl, buf);
+#endif
+}
+lguest_define_hook(show_coproc_regs);
+
 void __show_regs(struct pt_regs *regs)
 {
 	unsigned long flags;
@@ -295,26 +320,8 @@ void __show_regs(struct pt_regs *regs)
 		processor_modes[processor_mode(regs)],
 		isa_modes[isa_mode(regs)],
 		get_fs() == get_ds() ? "kernel" : "user");
-#ifdef CONFIG_CPU_CP15
-	{
-		unsigned int ctrl;
 
-		buf[0] = '\0';
-#ifdef CONFIG_CPU_CP15_MMU
-		{
-			unsigned int transbase, dac;
-			asm("mrc p15, 0, %0, c2, c0\n\t"
-			    "mrc p15, 0, %1, c3, c0\n"
-			    : "=r" (transbase), "=r" (dac));
-			snprintf(buf, sizeof(buf), "  Table: %08x  DAC: %08x",
-			  	transbase, dac);
-		}
-#endif
-		asm("mrc p15, 0, %0, c1, c0\n" : "=r" (ctrl));
-
-		printk("Control: %08x%s\n", ctrl, buf);
-	}
-#endif
+	show_coproc_regs(buf);
 }
 
 void show_regs(struct pt_regs * regs)
@@ -357,6 +364,16 @@ void release_thread(struct task_struct *dead_task)
 
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
+#ifdef CONFIG_ARM_LGUEST_GUEST
+/*
+ * ARM Lguest: Use a function pointer to call the function.
+ * The Guest' kernel  will change do_ret_from_fork to pointer at
+ * the Guest's own function when it boots up.
+ */
+void (* do_ret_from_fork)(void) = ret_from_fork;
+#endif
+
+
 int
 copy_thread(unsigned long clone_flags, unsigned long stack_start,
 	    unsigned long stk_sz, struct task_struct *p, struct pt_regs *regs)
@@ -370,7 +387,11 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
 
 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
 	thread->cpu_context.sp = (unsigned long)childregs;
+#ifdef CONFIG_ARM_LGUEST_GUEST
+	thread->cpu_context.pc = (unsigned long)do_ret_from_fork;
+#else
 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
+#endif
 
 	clear_ptrace_hw_breakpoint(p);
 
@@ -443,6 +464,12 @@ asm(	".pushsection .text\n"
 #define kernel_thread_exit	do_exit
 #endif
 
+unsigned long LGUEST_NATIVE(kernel_thread_cpsr) (void)
+{
+	return SVC_MODE | PSR_ENDSTATE | PSR_ISETSTATE | PSR_I_BIT;
+}
+lguest_define_hook(kernel_thread_cpsr);
+
 /*
  * Create a kernel thread.
  */
@@ -457,7 +484,7 @@ pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	regs.ARM_r6 = (unsigned long)kernel_thread_exit;
 	regs.ARM_r7 = SVC_MODE | PSR_ENDSTATE | PSR_ISETSTATE;
 	regs.ARM_pc = (unsigned long)kernel_thread_helper;
-	regs.ARM_cpsr = regs.ARM_r7 | PSR_I_BIT;
+	regs.ARM_cpsr = kernel_thread_cpsr();
 
 	return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }

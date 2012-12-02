@@ -23,6 +23,10 @@
 #include <asm/hardware/cache-l2x0.h>
 #include <linux/kbuild.h>
 
+#if defined(CONFIG_LGUEST) || defined(CONFIG_ARM_LGUEST_GUEST) || defined(CONFIG_LGUEST_MODULE)
+#include "../mach-armlguest/driver/lg.h"
+#endif
+
 /*
  * Make sure that the compiler and target are compatible.
  */
@@ -132,17 +136,66 @@ int main(void)
 #ifdef MULTI_PABORT
   DEFINE(PROCESSOR_PABT_FUNC,	offsetof(struct processor, _prefetch_abort));
 #endif
-#ifdef MULTI_CPU
+#if defined(MULTI_CPU) || defined(CONFIG_ARM_LGUEST_GUEST)
   DEFINE(CPU_SLEEP_SIZE,	offsetof(struct processor, suspend_size));
   DEFINE(CPU_DO_SUSPEND,	offsetof(struct processor, do_suspend));
   DEFINE(CPU_DO_RESUME,		offsetof(struct processor, do_resume));
 #endif
-#ifdef MULTI_CACHE
+#if defined(MULTI_CACHE) || defined(CONFIG_ARM_LGUEST_GUEST)
   DEFINE(CACHE_FLUSH_KERN_ALL,	offsetof(struct cpu_cache_fns, flush_kern_all));
 #endif
   BLANK();
   DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+
+#if defined(CONFIG_LGUEST) || defined(CONFIG_ARM_LGUEST_GUEST) || defined(CONFIG_LGUEST_MODULE)
+  BLANK();
+  DEFINE(LGUEST_PAGES_host_general_regs, offsetof(struct lguest_ro_state, gregs));
+  DEFINE(LGUEST_PAGES_host_pgd0, offsetof(struct lguest_ro_state, host_pgd0));
+  DEFINE(LGUEST_PAGES_host_pgd1, offsetof(struct lguest_ro_state, host_pgd1));
+  DEFINE(LGUEST_PAGES_host_context_id, offsetof(struct lguest_ro_state, host_cont_id));
+  DEFINE(LGUEST_PAGES_host_copro, offsetof(struct lguest_ro_state, host_copro));
+  DEFINE(LGUEST_PAGES_host_ctrl, offsetof(struct lguest_ro_state, host_ctrl));
+  DEFINE(LGUEST_PAGES_host_tls, offsetof(struct lguest_ro_state, host_tls));
+  DEFINE(LGUEST_PAGES_host_domain, offsetof(struct lguest_ro_state, host_domain));
+  DEFINE(LGUEST_PAGES_host_undstack, offsetof(struct lguest_ro_state, host_undstack));
+  DEFINE(LGUEST_PAGES_host_abtstack, offsetof(struct lguest_ro_state, host_abtstack));
+  DEFINE(LGUEST_PAGES_host_irqstack, offsetof(struct lguest_ro_state, host_irqstack));
+  DEFINE(LGUEST_PAGES_host_usrstack, offsetof(struct lguest_ro_state, host_usrstack));
+  DEFINE(LGUEST_PAGES_host_svcstack, offsetof(struct lguest_ro_state, host_svcstack));
+
+  BLANK();
+  DEFINE(LGUEST_PAGES_guest_general_regs, offsetof(struct lguest_pages, regs.gregs));
+  DEFINE(LGUEST_PAGES_guest_pgd0, offsetof(struct lguest_pages, regs.guest_pgd0));
+  DEFINE(LGUEST_PAGES_guest_pgd1, offsetof(struct lguest_pages, regs.guest_pgd1));
+  DEFINE(LGUEST_PAGES_guest_sp_offset, offsetof(struct lguest_pages, regs.guest_sp_offset));
+  DEFINE(LGUEST_PAGES_guest_context_id, offsetof(struct lguest_pages, regs.guest_cont_id));
+  DEFINE(LGUEST_PAGES_guest_tls, offsetof(struct lguest_pages, regs.guest_tls));
+  DEFINE(LGUEST_PAGES_guest_domain, offsetof(struct lguest_pages, regs.guest_domain));
+  DEFINE(LGUEST_PAGES_guest_retcode, offsetof(struct lguest_pages, regs.guest_retcode));
+  DEFINE(LGUEST_PAGES_guest_copro, offsetof(struct lguest_pages, regs.guest_copro));
+  DEFINE(LGUEST_PAGES_guest_ctrl, offsetof(struct lguest_pages, regs.guest_ctrl));
+
+  DEFINE(LGUEST_PAGES_guest_cpuid_id, offsetof(struct lguest_pages, regs.guest_cpuid_id));
+  DEFINE(LGUEST_PAGES_guest_cpuid_cachetype, offsetof(struct lguest_pages, regs.guest_cpuid_cachetype));
+  DEFINE(LGUEST_PAGES_guest_cpuid_tcm, offsetof(struct lguest_pages, regs.guest_cpuid_tcm));
+  DEFINE(LGUEST_PAGES_guest_cpuid_tlbtype, offsetof(struct lguest_pages, regs.guest_cpuid_tlbtype));
+  DEFINE(LGUEST_PAGES_guest_time, offsetof(struct lguest_pages, regs.guest_time));
+  DEFINE(LGUEST_PAGES_guest_irq_disabled, offsetof(struct lguest_pages, regs.irq_disabled));
+  DEFINE(LGUEST_PAGES_guest_gpgdir, offsetof(struct lguest_pages, regs.gpgdir));
+  DEFINE(LGUEST_PAGES_guest_cpu_arch, offsetof(struct lguest_pages, regs.guest_cpu_arch));
+  DEFINE(LGUEST_PAGES_guest_irqs_pending, offsetof(struct lguest_pages, regs.irqs_pending));
+  DEFINE(LGUEST_PAGES_guest_blocked_interrupts, offsetof(struct lguest_pages, regs.blocked_interrupts));
+
+
+  DEFINE(LGUEST_PAGES_guest_irq_sp, offsetof(struct lguest_regs, guest_estack.irq[0]));
+  DEFINE(LGUEST_PAGES_guest_abt_sp, offsetof(struct lguest_regs, guest_estack.abt[0]));
+  DEFINE(LGUEST_PAGES_guest_und_sp, offsetof(struct lguest_regs, guest_estack.und[0]));
+  DEFINE(LGUEST_PAGES_guest_hcalls, offsetof(struct lguest_regs, hcalls));
+
+  DEFINE(LGUEST_PAGES_guest_svc_sp, offsetof(struct lguest_pages, spare));
+#endif
+
   return 0; 
 }

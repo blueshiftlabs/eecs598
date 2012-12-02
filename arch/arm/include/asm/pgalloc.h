@@ -17,6 +17,7 @@
 #include <asm/processor.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+#include <asm/lguest-native.h>
 
 #define check_pgt_cache()		do { } while (0)
 
@@ -104,14 +105,15 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
 	__free_page(pte);
 }
 
-static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
-				  pmdval_t prot)
+static inline void LGUEST_NATIVE(__pmd_populate)
+(pmd_t *pmdp, phys_addr_t pte, pmdval_t prot)
 {
 	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
 	pmdp[0] = __pmd(pmdval);
 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
 	flush_pmd_entry(pmdp);
 }
+lguest_define_hook(__pmd_populate);
 
 /*
  * Populate the pmdp entry with a pointer to the pte.  This pmd is part

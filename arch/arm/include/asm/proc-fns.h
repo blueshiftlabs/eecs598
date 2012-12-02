@@ -15,6 +15,7 @@
 
 #include <asm/glue-proc.h>
 #include <asm/page.h>
+#include <asm/lguest-native.h>
 
 #ifndef __ASSEMBLY__
 
@@ -73,7 +74,7 @@ extern struct processor {
 	void (*do_resume)(void *);
 } processor;
 
-#ifndef MULTI_CPU
+#if (!defined MULTI_CPU) && (!defined CONFIG_ARM_LGUEST_GUEST)
 extern void cpu_proc_init(void);
 extern void cpu_proc_fin(void);
 extern int cpu_do_idle(void);
@@ -107,14 +108,15 @@ extern void cpu_resume(void);
 
 #define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
 
-#define cpu_get_pgd()	\
-	({						\
-		unsigned long pg;			\
-		__asm__("mrc	p15, 0, %0, c2, c0, 0"	\
-			 : "=r" (pg) : : "cc");		\
-		pg &= ~0x3fff;				\
-		(pgd_t *)phys_to_virt(pg);		\
-	})
+static inline pgd_t * LGUEST_NATIVE(cpu_get_pgd) (void)	
+{						
+	unsigned long pg;			
+	asm("mrc	p15, 0, %0, c2, c0, 0"	
+		 : "=r" (pg) : : "cc");		
+	pg &= ~0x3fff;				
+	return (pgd_t *)phys_to_virt(pg);		
+}
+lguest_define_hook(cpu_get_pgd);
 
 #endif
 

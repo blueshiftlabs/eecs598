@@ -1,0 +1,86 @@
+
+Please read Document/lguest/lguest.txt first!
+
+
+ARM Lguest is designed to be a hypervisor for the ARM Linux kernel,
+for Linux developers and users to experiment with virtualization with the
+minimum of complexity.  Nonetheless, it has only been tested on Omap3530 
+by now. 
+
+NOTE:
+If you want to run ARM Lguest on ARM chips which are not ARMv7, 
+before building the kernel, you should modify 
+linux/arch/arm/mach-armlguest/driver/arm/page_table_arm.h, 
+linux/arch/arm/mach-armlguest/driver/arm/switcher-head.S and 
+linux/arch/arm/mach-armlguest/kernel/proc-lguest.S 
+by replacing "#ifdef CONFIG_CPU_V7" with "#if 1". But I am not sure
+whether it can work on other ARM chips or not.
+ 
+
+
+
+Building Kernel For Lguest:
+- You should issue "make ulgImage" to compile Linux Kernel.
+  ulgImage is uboot header(64 bytes) + Image(uncompressed image).
+  At present, uImage (uboot header(64 bytes) +  zImage) cannot 
+  be as the Guest. 
+
+NOTE:
+	ulgImage MUST NOT BE larger than 4M.
+    (The Guest Kernel cannot boot when ulgImage is larger than 4M in my
+     Development Board.)	
+	
+
+Running Lguest:
+
+- The easiest way to run lguest is to use same kernel as guest and host.
+
+  You will need to configure your kernel with the following options:
+
+  "System Type":
+     "ARM Lguest guest support" = Y 	
+     "ARM Linux hypervisor example code = M/Y
+     (CONFIG_ARM_LGUEST_GUEST=y ARM_LGUEST_GUEST=m)
+     	
+
+  "Device Drivers":
+     "Block devices"
+        "Virtio block driver (EXPERIMENTAL)" = Y
+
+     "Network device support"
+        "Universal TUN/TAP device driver support" = Y
+        "Virtio network driver (EXPERIMENTAL)" = Y
+           (CONFIG_VIRTIO_BLK=y, CONFIG_VIRTIO_NET=y and CONFIG_TUN=y)
+
+
+- A tool called "lguest" is available in this directory: type "make"
+  to build it.  If you didn't build your kernel in-tree, use "make
+  O=<builddir>".
+
+- Create or find a root disk image.  
+
+  Make sure that you install a getty on /dev/hvc0 if you want to log in on the
+  console!
+
+- "modprobe lg" if you built it as a module.
+
+- Run an lguest as root:
+
+   Documentation/lguest/arm/lguest 64 ulgImage --block=rootfile root=/dev/vda    
+
+   Explanation:
+    64: the amount of memory to use, in MB.
+
+    ulgImage: please see "Building Kernel For Lguest" above. 
+
+    --block=rootfile: a file or block device which becomes /dev/vda
+       inside the guest.
+
+    root=/dev/vda: this (and anything else on the command line) are
+       kernel boot parameters.
+
+
+- I have not tested "tunnet" on my ARM Board. 
+
+Good luck!
+Mingli Wu  myfavor_linux@msn.com

@@ -11,6 +11,7 @@
 #define __ASM_ARM_PTRACE_H
 
 #include <asm/hwcap.h>
+#include <asm/lguest-native.h>
 
 #define PTRACE_GETREGS		12
 #define PTRACE_SETREGS		13
@@ -137,8 +138,11 @@ struct pt_regs {
 
 #ifdef __KERNEL__
 
-#define user_mode(regs)	\
-	(((regs)->ARM_cpsr & 0xf) == 0)
+static inline int LGUEST_NATIVE(user_mode) (struct pt_regs *regs)
+{
+	return ((regs->ARM_cpsr & 0xf) == 0);
+}
+lguest_define_hook(user_mode);
 
 #ifdef CONFIG_ARM_THUMB
 #define thumb_mode(regs) \
@@ -151,8 +155,12 @@ struct pt_regs {
 	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
 	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
 
-#define processor_mode(regs) \
-	((regs)->ARM_cpsr & MODE_MASK)
+static inline unsigned int LGUEST_NATIVE(processor_mode)
+	(struct pt_regs *regs)
+{
+	return (regs->ARM_cpsr & MODE_MASK);
+}
+lguest_define_hook(processor_mode);
 
 #define interrupts_enabled(regs) \
 	(!((regs)->ARM_cpsr & PSR_I_BIT))

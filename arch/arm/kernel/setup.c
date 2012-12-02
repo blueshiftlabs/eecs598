@@ -45,6 +45,7 @@
 #include <asm/cachetype.h>
 #include <asm/tlbflush.h>
 #include <asm/system.h>
+#include <asm/lguest-native.h>
 
 #include <asm/prom.h>
 #include <asm/mach/arch.h>
@@ -101,16 +102,16 @@ unsigned int elf_hwcap __read_mostly;
 EXPORT_SYMBOL(elf_hwcap);
 
 
-#ifdef MULTI_CPU
+#if (defined MULTI_CPU) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct processor processor __read_mostly;
 #endif
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_tlb_fns cpu_tlb __read_mostly;
 #endif
-#ifdef MULTI_USER
+#if (defined MULTI_USER) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_user_fns cpu_user __read_mostly;
 #endif
-#ifdef MULTI_CACHE
+#if (defined MULTI_CACHE) || (defined CONFIG_ARM_LGUEST_GUEST)
 struct cpu_cache_fns cpu_cache __read_mostly;
 #endif
 #ifdef CONFIG_OUTER_CACHE
@@ -220,7 +221,7 @@ static const char *proc_arch[] = {
 	"?(17)",
 };
 
-static int __get_cpu_architecture(void)
+int LGUEST_NATIVE(__get_cpu_architecture) (void)
 {
 	int cpu_arch;
 
@@ -252,6 +253,7 @@ static int __get_cpu_architecture(void)
 
 	return cpu_arch;
 }
+lguest_define_hook(__get_cpu_architecture);
 
 int __pure cpu_architecture(void)
 {
@@ -259,6 +261,7 @@ int __pure cpu_architecture(void)
 
 	return __cpu_architecture;
 }
+EXPORT_SYMBOL(cpu_architecture);
 
 static int cpu_has_aliasing_icache(unsigned int arch)
 {
@@ -444,16 +447,16 @@ static void __init setup_processor(void)
 	cpu_name = list->cpu_name;
 	__cpu_architecture = __get_cpu_architecture();
 
-#ifdef MULTI_CPU
+#if (defined MULTI_CPU) || (defined CONFIG_ARM_LGUEST_GUEST)
 	processor = *list->proc;
 #endif
-#ifdef MULTI_TLB
+#if (defined MULTI_TLB) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_tlb = *list->tlb;
 #endif
-#ifdef MULTI_USER
+#if (defined MULTI_USER) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_user = *list->user;
 #endif
-#ifdef MULTI_CACHE
+#if (defined MULTI_CACHE) || (defined CONFIG_ARM_LGUEST_GUEST)
 	cpu_cache = *list->cache;
 #endif
 
@@ -891,6 +894,18 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
 }
 
 
+void LGUEST_NATIVE(cpu_tcm_init) (void)
+{
+#ifdef CONFIG_SMP
+	if (is_smp())
+		smp_init_cpus();
+#endif
+	reserve_crashkernel();
+
+	tcm_init();
+}
+lguest_define_hook(cpu_tcm_init);
+
 void __init setup_arch(char **cmdline_p)
 {
 	struct machine_desc *mdesc;
@@ -926,13 +941,7 @@ void __init setup_arch(char **cmdline_p)
 
 	unflatten_device_tree();
 
-#ifdef CONFIG_SMP
-	if (is_smp())
-		smp_init_cpus();
-#endif
-	reserve_crashkernel();
-
-	tcm_init();
+	cpu_tcm_init();
 
 #ifdef CONFIG_ZONE_DMA
 	if (mdesc->dma_zone_size) {
@@ -951,6 +960,7 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
 	early_trap_init();
 
 	if (mdesc->init_early)

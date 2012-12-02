@@ -180,19 +180,22 @@ extern unsigned int user_debug;
 extern unsigned long cr_no_alignment;	/* defined in entry-armv.S */
 extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 
-static inline unsigned int get_cr(void)
+
+static inline unsigned int LGUEST_NATIVE(get_cr) (void)
 {
 	unsigned int val;
 	asm("mrc p15, 0, %0, c1, c0, 0	@ get CR" : "=r" (val) : : "cc");
 	return val;
 }
+lguest_define_hook(get_cr);
 
-static inline void set_cr(unsigned int val)
+static inline void LGUEST_NATIVE(set_cr) (unsigned int val)
 {
 	asm volatile("mcr p15, 0, %0, c1, c0, 0	@ set CR"
 	  : : "r" (val) : "cc");
 	isb();
 }
+lguest_define_hook(set_cr);
 
 #ifndef CONFIG_SMP
 extern void adjust_cr(unsigned long mask, unsigned long set);
@@ -202,20 +205,22 @@ extern void adjust_cr(unsigned long mask, unsigned long set);
 #define CPACC_SVC(n)		(1 << (n * 2))
 #define CPACC_DISABLE(n)	(0 << (n * 2))
 
-static inline unsigned int get_copro_access(void)
+static inline unsigned int LGUEST_NATIVE(get_copro_access) (void)
 {
 	unsigned int val;
 	asm("mrc p15, 0, %0, c1, c0, 2 @ get copro access"
 	  : "=r" (val) : : "cc");
 	return val;
 }
+lguest_define_hook(get_copro_access);
 
-static inline void set_copro_access(unsigned int val)
+static inline void LGUEST_NATIVE(set_copro_access) (unsigned int val)
 {
 	asm volatile("mcr p15, 0, %0, c1, c0, 2 @ set copro access"
 	  : : "r" (val) : "cc");
 	isb();
 }
+lguest_define_hook(set_copro_access);
 
 /*
  * switch_mm() may do a full cache flush over the context switch,
@@ -229,7 +234,10 @@ static inline void set_copro_access(unsigned int val)
  * `prev' will never be the same as `next'.  schedule() itself
  * contains the memory barrier to tell GCC not to cache `current'.
  */
-extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
+extern struct task_struct *LGUEST_NATIVE(__switch_to)
+	(struct task_struct *, struct thread_info *, struct thread_info *);
+
+lguest_define_hook(__switch_to);
 
 #define switch_to(prev,next,last)					\
 do {									\

@@ -34,6 +34,7 @@
 #include <asm/traps.h>
 #include <asm/unwind.h>
 #include <asm/tls.h>
+#include <asm/lguest-native.h>
 
 #include "signal.h"
 
@@ -494,6 +495,31 @@ do_cache_op(unsigned long start, unsigned long end, int flags)
 }
 
 /*
+ * ARM Lguest: Put original code into a function and use a 
+ * function pointer to call the function.
+ * The Guest' kernel  will change do_set_tls to pointer at
+ * the Guest's own function when it boots up.
+ */
+void LGUEST_NATIVE(syscall_set_tls) (unsigned long tls)
+{
+	if (tls_emu)
+		return;
+	if (has_tls_reg) {
+		asm ("mcr p15, 0, %0, c13, c0, 3"
+			: : "r" (tls));
+	} else {
+		/*
+		 * User space must never try to access this directly.
+		 * Expect your app to break eventually if you do so.
+		 * The user helper at 0xffff0fe0 must be used instead.
+		 * (see entry-armv.S for details)
+		 */
+		*((unsigned int *)0xffff0ff0) = tls;
+	}
+}
+lguest_define_hook(syscall_set_tls);
+
+/*
  * Handle all unrecognised system calls.
  *  0x9f0000 - 0x9fffff are some more esoteric system calls
  */
@@ -553,21 +579,10 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 
 	case NR(set_tls):
 		thread->tp_value = regs->ARM_r0;
-		if (tls_emu)
-			return 0;
-		if (has_tls_reg) {
-			asm ("mcr p15, 0, %0, c13, c0, 3"
-				: : "r" (regs->ARM_r0));
-		} else {
-			/*
-			 * User space must never try to access this directly.
-			 * Expect your app to break eventually if you do so.
-			 * The user helper at 0xffff0fe0 must be used instead.
-			 * (see entry-armv.S for details)
-			 */
-			*((unsigned int *)0xffff0ff0) = regs->ARM_r0;
-		}
+
+		syscall_set_tls(regs->ARM_r0);
 		return 0;
+
 
 #ifdef CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG
 	/*
@@ -781,7 +796,7 @@ static void __init kuser_get_tls_init(unsigned long vectors)
 		memcpy((void *)vectors + 0xfe0, (void *)vectors + 0xfe8, 4);
 }
 
-void __init early_trap_init(void)
+void __init LGUEST_NATIVE(early_trap_init) (void)
 {
 #if defined(CONFIG_CPU_USE_DOMAINS)
 	unsigned long vectors = CONFIG_VECTORS_BASE;
@@ -819,3 +834,4 @@ void __init early_trap_init(void)
 	flush_icache_range(vectors, vectors + PAGE_SIZE);
 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
 }
+lguest_define_hook(early_trap_init) __initdata;

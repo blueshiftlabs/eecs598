@@ -10,6 +10,8 @@
 #ifndef __ASM_PROC_DOMAIN_H
 #define __ASM_PROC_DOMAIN_H
 
+#include <asm/lguest-native.h>
+
 /*
  * Domain numbers
  *
@@ -56,13 +58,15 @@
 #ifndef __ASSEMBLY__
 
 #ifdef CONFIG_CPU_USE_DOMAINS
-#define set_domain(x)					\
-	do {						\
-	__asm__ __volatile__(				\
-	"mcr	p15, 0, %0, c3, c0	@ set domain"	\
-	  : : "r" (x));					\
-	isb();						\
-	} while (0)
+
+static inline void LGUEST_NATIVE(set_domain) (unsigned int domain) {
+	asm volatile (
+		"mcr	p15, 0, %0, c3, c0	@ set domain"
+		: : "r" (domain)
+	);
+	isb();
+}
+lguest_define_hook(set_domain);
 
 #define modify_domain(dom,type)					\
 	do {							\

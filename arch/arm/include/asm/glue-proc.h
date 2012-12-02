@@ -248,7 +248,7 @@
 # endif
 #endif
 
-#ifndef MULTI_CPU
+#if !defined(MULTI_CPU) && !defined(CONFIG_ARM_LGUEST_GUEST)
 #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
 #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
 #define cpu_reset			__glue(CPU_NAME,_reset)

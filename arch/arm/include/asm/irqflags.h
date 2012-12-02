@@ -4,13 +4,14 @@
 #ifdef __KERNEL__
 
 #include <asm/ptrace.h>
+#include <asm/lguest-native.h>
 
 /*
  * CPU interrupt mask handling.
  */
 #if __LINUX_ARM_ARCH__ >= 6
 
-static inline unsigned long arch_local_irq_save(void)
+static inline unsigned long LGUEST_NATIVE(arch_local_irq_save) (void)
 {
 	unsigned long flags;
 
@@ -21,7 +22,7 @@ static inline unsigned long arch_local_irq_save(void)
 	return flags;
 }
 
-static inline void arch_local_irq_enable(void)
+static inline void LGUEST_NATIVE(arch_local_irq_enable) (void)
 {
 	asm volatile(
 		"	cpsie i			@ arch_local_irq_enable"
@@ -30,7 +31,7 @@ static inline void arch_local_irq_enable(void)
 		: "memory", "cc");
 }
 
-static inline void arch_local_irq_disable(void)
+static inline void LGUEST_NATIVE(arch_local_irq_disable) (void)
 {
 	asm volatile(
 		"	cpsid i			@ arch_local_irq_disable"
@@ -39,14 +40,30 @@ static inline void arch_local_irq_disable(void)
 		: "memory", "cc");
 }
 
-#define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
-#define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
-#else
+static inline void LGUEST_NATIVE(local_fiq_enable) (void)
+{	
+	asm volatile(
+		"cpsie f	@ __stf"
+		:
+		:
+		: "memory", "cc");
+}
+
+static inline void LGUEST_NATIVE(local_fiq_disable) (void)
+{
+	asm volatile(
+		"cpsid f	@ __clf"
+		:
+		:
+		: "memory", "cc");
+}
+
+#else /* __LINUX_ARM_ARCH__ < 6 */
 
 /*
  * Save the current interrupt enable state & disable IRQs
  */
-static inline unsigned long arch_local_irq_save(void)
+static inline unsigned long LGUEST_NATIVE(arch_local_irq_save) (void)
 {
 	unsigned long flags, temp;
 
@@ -60,10 +77,11 @@ static inline unsigned long arch_local_irq_save(void)
 	return flags;
 }
 
+
 /*
  * Enable IRQs
  */
-static inline void arch_local_irq_enable(void)
+static inline void LGUEST_NATIVE(arch_local_irq_enable) (void)
 {
 	unsigned long temp;
 	asm volatile(
@@ -78,7 +96,7 @@ static inline void arch_local_irq_enable(void)
 /*
  * Disable IRQs
  */
-static inline void arch_local_irq_disable(void)
+static inline void LGUEST_NATIVE(arch_local_irq_disable) (void)
 {
 	unsigned long temp;
 	asm volatile(
@@ -93,39 +111,36 @@ static inline void arch_local_irq_disable(void)
 /*
  * Enable FIQs
  */
-#define local_fiq_enable()					\
-	({							\
-		unsigned long temp;				\
-	__asm__ __volatile__(					\
-	"mrs	%0, cpsr		@ stf\n"		\
-"	bic	%0, %0, #64\n"					\
-"	msr	cpsr_c, %0"					\
-	: "=r" (temp)						\
-	:							\
-	: "memory", "cc");					\
-	})
+static inline void LGUEST_NATIVE(local_fiq_enable) (void)
+{							
+	unsigned long temp;				
+	asm volatile(					
+		"	mrs	%0, cpsr		@ stf\n"		
+		"	bic	%0, %0, #64\n"
+		"	msr	cpsr_c, %0"					
+		: "=r" (temp)						
+		:							
+		: "memory", "cc");
+}
 
-/*
- * Disable FIQs
- */
-#define local_fiq_disable()					\
-	({							\
-		unsigned long temp;				\
-	__asm__ __volatile__(					\
-	"mrs	%0, cpsr		@ clf\n"		\
-"	orr	%0, %0, #64\n"					\
-"	msr	cpsr_c, %0"					\
-	: "=r" (temp)						\
-	:							\
-	: "memory", "cc");					\
-	})
+static inline void LGUEST_NATIVE(local_fiq_disable) (void)
+{							
+	unsigned long temp;				
+	asm volatile(					
+		"	mrs	%0, cpsr		@ clf\n"		
+		"	orr	%0, %0, #64\n"
+		"	msr	cpsr_c, %0"					
+		: "=r" (temp)						
+		:							
+		: "memory", "cc");
+}
 
-#endif
+#endif /* __LINUX_ARM_ARCH__ >= 6 */
 
 /*
  * Save the current interrupt enable state.
  */
-static inline unsigned long arch_local_save_flags(void)
+static inline unsigned long LGUEST_NATIVE(arch_local_save_flags) (void)
 {
 	unsigned long flags;
 	asm volatile(
@@ -137,7 +152,7 @@ static inline unsigned long arch_local_save_flags(void)
 /*
  * restore saved IRQ & FIQ state
  */
-static inline void arch_local_irq_restore(unsigned long flags)
+static inline void LGUEST_NATIVE(arch_local_irq_restore) (unsigned long flags)
 {
 	asm volatile(
 		"	msr	cpsr_c, %0	@ local_irq_restore"
@@ -145,6 +160,14 @@ static inline void arch_local_irq_restore(unsigned long flags)
 		: "r" (flags)
 		: "memory", "cc");
 }
+
+lguest_define_hook(arch_local_irq_save);
+lguest_define_hook(arch_local_save_flags);
+lguest_define_hook(arch_local_irq_restore);
+lguest_define_hook(arch_local_irq_enable);
+lguest_define_hook(arch_local_irq_disable);
+lguest_define_hook(local_fiq_enable);
+lguest_define_hook(local_fiq_disable);
 
 static inline int arch_irqs_disabled_flags(unsigned long flags)
 {

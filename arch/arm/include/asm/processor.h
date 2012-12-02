@@ -83,11 +83,15 @@ extern void release_thread(struct task_struct *);
 
 unsigned long get_wchan(struct task_struct *p);
 
+static inline void LGUEST_NATIVE(cpu_relax) (void)
+{
 #if __LINUX_ARM_ARCH__ == 6 || defined(CONFIG_ARM_ERRATA_754327)
-#define cpu_relax()			smp_mb()
+	smp_mb();
 #else
-#define cpu_relax()			barrier()
+	barrier();
 #endif
+}
+lguest_define_hook(cpu_relax);
 
 /*
  * Create a new kernel thread
